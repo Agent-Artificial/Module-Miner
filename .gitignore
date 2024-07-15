@@ -6,3 +6,4 @@ data
 .wav
 .mp4
 .mkv
+__pycache__
