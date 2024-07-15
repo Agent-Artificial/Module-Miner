@@ -1,0 +1,105 @@
+{% block startRecording %}
+  <button id="startRecording" class="flex items-center justify-center bg-red-500 hover:bg-red-700 rounded-full font-bold text-white" style="width: 128px; height: 128px; overflow: hidden;"><img src="/assets/microphone.svg" alt="Microphone" /></button>
+  <button id="stopRecording" class="bg-red-500 hover:bg-red-700 p-4 rounded-full font-bold text-white" hidden><img src="/assets/microphone-off.svg" alt="Microphone Off" class="mx-auto" /></button>
+  <div id="recordingResult" class="m-2"></div>
+{% endblock %}
+
+<script>
+    // Audio recording
+    let mediaRecorder;
+    let audioChunks = [];
+
+    function getOptions() {
+        return {
+        textInputArea: document.getElementById("textInputArea")?.value || "",
+        inputModeOptions: document.getElementById("inputModeOptions")?.value || "",
+        outputModeOptions: document.getElementById("outputModeOptions")?.value || "",
+        sourceLanguageOptions: document.getElementById("sourceLanguageOptions")?.value || "",
+        targetLanguageOptions: document.getElementById("targetLanguageOptions")?.value || "",
+        };
+    }
+
+        document.getElementById("startRecording").addEventListener("click", async () => {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    audio: true,
+            });
+            mediaRecorder = new MediaRecorder(stream);
+
+            mediaRecorder.ondataavailable = (event) => {
+                audioChunks.push(event.data);
+        };
+
+        mediaRecorder.onstop = async () => {
+            const audioBlob = new Blob(audioChunks, { type: "audio/wav" });
+            const reader = new FileReader
+                
+            reader.onloadend = async () => {
+                const base64Audio = reader.results.split(',')[1];
+                const formData = new FormData();
+
+                formData.append("audioData", base64Audio);
+                
+                const options = getOptions();
+                console.log(options);
+                Object.keys(options).forEach((key) =>
+                    formData.append(key, options[key])
+                );
+                
+                try {
+                    const response = await fetch("/translate", {
+                        method: "POST",
+                        body: formData,
+                    });
+        
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+
+                    const htmlResponse = await response.text();
+                    handleTranslationResult(htmlResponse);
+                    reader.readAsDataURL(audioBlob);
+                } catch (error) {
+                    console.error("Error:", error);
+                    document.getElementById("result").textContent =
+                        "Error occurred during translation.";
+                }
+                mediaRecorder.start();
+                document.getElementById("startRecording").hidden = true;
+                document.getElementById("stopRecording").hidden = false;
+
+            }
+
+            reader.readAsDataURL(audioBlob);
+            audioChunks = [];
+        };
+
+        mediaRecorder.start();
+        document.getElementById("startRecording").hidden = true;
+        document.getElementById("stopRecording").hidden = false;
+            } catch (error) {
+                console.error("Error accessing microphone:", error);
+                document.getElementById("result").textContent =
+                    "Error accessing microphone.";
+            }
+        });
+    document.getElementById("stopRecording").addEventListener("click", () => {
+        mediaRecorder.stop();
+        document.getElementById("startRecording").hidden = false;
+        document.getElementById("stopRecording").hidden = true;
+    });
+
+    function handleTranslationResult(htmlResponse) {
+        const resultDiv = document.getElementById("#audioOutputArea");
+        resultDiv.innerHTML = htmlResponse;
+
+        // Ensure the textarea is readonly
+        const textOutputArea = resultDiv.querySelector("#textOutputArea");
+        if (textOutputArea) {
+        textOutputArea.readOnly = true;
+        }
+
+        // The audio player should already be set up in the HTML response,
+        // so we don't need to do anything extra for it.
+    }
+</script>
