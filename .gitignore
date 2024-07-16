@@ -7,3 +7,6 @@ data
 .mp4
 .mkv
 __pycache__
+templates
+.vscode
+.pyest_cache

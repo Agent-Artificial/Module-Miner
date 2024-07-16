@@ -1,10 +1,12 @@
 import os
 import json
-from pydantic import BaseModel, Field
-from typing import Dict, Any, List
-from base.base_module import BaseModule
-from base.base_miner import MinerConfig, ModuleConfig, BaseMiner
+import base64
+import requests
+import subprocess
 from importlib import import_module
+from typing import Dict, Any, Optional
+from pydantic import BaseModel
+from data_models import MinerConfig, ModuleConfig, BaseModule, app
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -19,120 +21,320 @@ miner_config = MinerConfig(
     netuid=os.getenv("NETUID"),
     funding_key=os.getenv("FUNDING_KEY"),
     funding_modifier=os.getenv("MODIFIER"),
-    module_name=os.getenv("MODULE_NAME")
+    module_name=os.getenv("MODULE_NAME"),
 )
 
 
 class ModuleManager:
-    modules: Dict[str, Any]
-    active_modules: Dict[str, Any]
-    module_configs: Dict[str, Any]
-    
-    def __init__(self):
-        self.modules = {}
-        self.active_modules = {}
-        self.module_configs = self.get_configs()
-        
-    def get_configs(self):
-        configs = []
-        if os.path.exists("data/instance_data/module_configs.json"):
-            with open("data/instance_data/module_configs.json", "r", encoding="utf-8") as f:
-                configs = json.loads(f.read())
+    def __init__(self, module: BaseModule):
+        """
+        Initializes the ModuleManager with the given module.
+
+        Parameters:
+            module (BaseModule): The module to be initialized with.
+
+        Returns:
+            None
+        """
+        self.module = module
+        self.modules: Dict[str, Any] = {}
+        self.active_modules: Dict[str, Any] = {}
+        self.module_configs: Dict[str, Any] = self.get_configs()
+
+    def get_configs(self) -> Dict[str, Any]:
+        """
+        Retrieves and returns the module configurations stored in the 'module_configs.json' file.
+
+        Returns:
+            Dict[str, Any]: A dictionary containing the module configurations.
+        """
+        config_path = "data/instance_data/module_configs.json"
+        os.makedirs(os.path.dirname(config_path), exist_ok=True)
+
+        if os.path.exists(config_path):
+            with open(config_path, "r", encoding="utf-8") as f:
+                return json.load(f)
         else:
-            if not os.path.exists("data/instance_data"):
-                os.makedirs("data/instance_data")
-            with open("data/instance_data/module_configs.json", "w", encoding="utf-8") as f:
-                f.write(json.dumps(configs, indent=4))
-        return configs
+            with open(config_path, "w", encoding="utf-8") as f:
+                json.dump({}, f, indent=4)
+            return {}
 
     def get_module(self):
-        for config in self.module_configs:
-            module_name = config.module_name
+        """
+        Retrieves the modules based on the configurations stored in `module_configs`.
+        It iterates through the module configurations, dynamically imports the module,
+        and stores the module in the `modules` dictionary with the module name as the key.
+
+        Returns:
+            Dict: A dictionary containing the imported modules.
+        """
+        for config in self.module_configs.values():
+            module_name = config["module_name"]
             for dir in os.listdir("modules"):
-                if config in dir:
-                    module = import_module(f"{dir}.{module_name}")
+                if module_name in dir:
+                    module = import_module(f"modules.{dir}.{module_name}")
                     self.modules[module_name] = module
-        with open("modules/registry.json", "w", encoding="utf-8") as f:
-            f.write(self.modules)
+
+        self.save_registry()
         return self.modules
-    
-    def add_module_config(self):
+
+    def add_module_config(
+        self,
+        module_name: Optional[str] = None,
+        module_path: Optional[str] = None,
+        module_endpoint: Optional[str] = None,
+        module_url: Optional[str] = None,
+    ):
+        """
+        Adds a module configuration to the `ModuleManager`.
+
+        Args:
+            module_name (Optional[str], optional): The name of the module. If not provided, the value from the environment variable `MODULE_NAME` or user input will be used. Defaults to None.
+            module_path (Optional[str], optional): The path to the module. If not provided, the value from the environment variable `MODULE_PATH` or the default path `modules/{module_name}` will be used. Defaults to None.
+            module_endpoint (Optional[str], optional): The endpoint of the module. If not provided, the value from the environment variable `MODULE_ENDPOINT` or the default endpoint `/modules/{module_name}` will be used. Defaults to None.
+            module_url (Optional[str], optional): The URL of the module. If not provided, the value from the environment variable `MODULE_URL` or the default URL `http://localhost:4267` will be used. Defaults to None.
+
+        Returns:
+            module: The installed module.
+
+        Raises:
+            None.
+
+        Notes:
+            - This function checks if the module already exists.
+            - It installs the module using the provided `module_config`.
+            - It saves the `module_config` in `self.module_configs`.
+            - It saves the module configurations.
+            - It imports the module.
+            - It saves the module in `self.modules`.
+            - It sets the module as the current module.
+            - It saves the module in the module registry.
+            - It sets up the module.
+        """
+        input_name = (
+            module_name or os.getenv("MODULE_NAME") or input("Add module name: ")
+        )
+
+        module_name = input_name
         module_config = ModuleConfig(
-            module_name=input("Enter module_name: "),
-            module_path=input("Enter module_path: "),
-            module_endpoint=input("Enter module_endpoint: "),
-            module_url=input("Enter module_url: ")
+            module_name=input_name or os.getenv("MODULE_NAME"),
+            module_path=module_path
+            or os.getenv("MODULE_PATH")
+            or f"modules/{input_name}",
+            module_endpoint=module_endpoint
+            or os.getenv("MODULE_ENDPOINT")
+            or f"/modules/{input_name}",
+            module_url=module_url or os.getenv("MODULE_URL") or "http://localhost:4267",
         )
         self.module_configs[module_config.module_name] = module_config.model_dump()
-        with open("data/instance_data/module_configs.json", "w", encoding="utf-8") as f:
-            f.write(json.dumps(self.module_configs, indent=4))
-        module = self.install_module(module_config)
-        self.modules = module
-        return self.module_configs
-    
+        self.save_configs()
+        return self.install_module(module_config)
+
     def install_module(self, module_config: ModuleConfig):
-        module = BaseModule(module_config)
-        if module.check_for_existing_module():
-            overwrite = input("Module already exists. Overwrite? [y/n]: ")
-            if overwrite == ("y" or "yes" or "Y" or "YES" or ""):
-                module.install_module(module_config)
-            else:
-                return
-        else:
-            module.install_module(module_config)
-            with open("data/instance_data/module_configs.json", "w", encoding="utf-8") as f:
-                f.write(json.dumps(self.module_configs, indent=4))
-            module = self.modules[module_config.module_name]
-            module.save_module(module_config, module.get_module())
-            with open("modules/registry.json", "w", encoding="utf-8") as f:
-                f.write(json.dumps(self.modules, indent=4))
+        """
+        Installs a module based on the provided `ModuleConfig`.
+
+        Args:
+            module_config (ModuleConfig): The configuration for the module to install.
+
+        Returns:
+            module: The installed module.
+
+        Raises:
+            None.
+
+        Notes:
+            - This function checks if the module already exists.
+            - It installs the module using the provided `module_config`.
+            - It saves the `module_config` in `self.module_configs`.
+            - It saves the module configurations.
+            - It imports the module.
+            - It saves the module in `self.modules`.
+            - It sets the module as the current module.
+            - It saves the module in the module registry.
+            - It sets up the module.
+
+        """
+        self.module.check_for_existing_module()
+        self.module.install_module(module_config)
+        self.module_configs[module_config.module_name] = module_config.model_dump()
+        self.save_configs()
+
+        module = import_module(
+            f"modules.{module_config.module_name}.{module_config.module_name}"
+        )
         self.modules[module_config.module_name] = module
-        self.active_modules[module_config.module_name] = module
-        module.setup_module()
+        self.module = module
+        self.save_module(module_config, module)
+        self.save_registry()
         return module
-    
-    def activate_module(self, module_config: ModuleConfig):
-        if module_config.module_name in self.modules:
-            self.active_modules[module_config.module_name] = self.modules[module_config.module_name]
-        else:
-            self.install_module(module_config)
-            
-        self.active_modules[module_config.module_name].setup_module(miner_config)
-        return self.active_modules
-    
+
+    def confirm_overwrite(self):
+        """
+        Confirms whether the user wants to overwrite an existing module.
+
+        Returns:
+            bool: True if the user wants to overwrite the module, False otherwise.
+        """
+        return input("Module already exists. Overwrite? [y/N]: ").lower() in [
+            "y",
+            "yes",
+        ]
+
+    def request_module(self, module_config: ModuleConfig):
+        """
+        A description of the request_module function which makes a request to a module URL
+        and writes the response to a setup file.
+        """
+        try:
+            response = requests.get(
+                f"{module_config.module_url}/modules/{module_config.module_name}",
+                timeout=30,
+            )
+            response.raise_for_status()
+            setup_file = response.text
+            with open(
+                f"modules/{module_config.module_name}/setup_{module_config.module_name}.py",
+                "w",
+                encoding="utf-8",
+            ) as f:
+                f.write(base64.b64decode(setup_file).decode("utf-8"))
+        except requests.RequestException as e:
+            print(f"Error requesting module: {e}")
+
+    def setup_module(self, module_config: ModuleConfig):
+        """
+        Runs the setup process for the specified module configuration.
+
+        Args:
+            module_config (ModuleConfig): The configuration for the module.
+
+        Raises:
+            subprocess.CalledProcessError: If an error occurs during the setup process.
+        """
+        try:
+            subprocess.run(
+                [
+                    "python",
+                    "-m",
+                    f"modules.{module_config.module_name}.setup_{module_config.module_name}",
+                ],
+                check=True,
+            )
+        except subprocess.CalledProcessError as e:
+            print(f"Error setting up module: {e}")
+
     def remove_module(self, module_config: ModuleConfig):
-        if module_config.module_name in self.active_modules:
-            del self.active_modules[module_config.module_name]
+        """
+        Removes a module from the active modules based on the provided module configuration.
+
+        Args:
+            module_config (ModuleConfig): The configuration of the module to be removed.
+
+        Returns:
+            Dict: The updated dictionary of active modules after removal.
+        """
+        self.active_modules.pop(module_config.module_name, None)
         return self.active_modules
-    
-    def get_active_modules(self):
-        return self.active_modules
-    
+
     def save_module(self, module_config: ModuleConfig, module_data):
-        module = self.active_modules[module_config.module_name]
-        module.save_module(module_config, module_data)
-        
+        """
+        Saves the module data for a given module configuration.
+
+        Args:
+            module_config (ModuleConfig): The configuration for the module.
+            module_data: The data to be saved.
+
+        Returns:
+            None
+        """
+        if module_config.module_name in self.active_modules:
+            self.active_modules[module_config.module_name].save_module(
+                module_config, module_data
+            )
+
     def register_module(self, module_config: ModuleConfig):
-        self.module_configs.append(module_config)
+        """
+        Register a new module with the given module configuration.
+
+        Parameters:
+            self: the ModuleManager object
+            module_config: an instance of ModuleConfig containing the module configuration
+
+        Returns:
+            None
+        """
+        self.module_configs[module_config.module_name] = module_config.model_dump()
+        self.save_configs()
+        self.save_registry()
+
+    def save_configs(self):
+        """
+        Save the module configurations to a JSON file.
+
+        No parameters are taken.
+
+        No return value.
+        """
         with open("data/instance_data/module_configs.json", "w", encoding="utf-8") as f:
-            f.write(json.dumps(self.module_configs, indent=4))
+            json.dump(self.module_configs, f, indent=4)
+
+    def save_registry(self):
+        """
+        Saves the registry of modules to a JSON file.
+        """
         with open("modules/registry.json", "w", encoding="utf-8") as f:
-            f.write(json.dumps(self.modules, indent=4))
-        
+            json.dump(
+                {name: str(module) for name, module in self.modules.items()},
+                f,
+                indent=4,
+            )
+
     def list_modules(self):
+        """
+        Prints the list of active modules.
+
+        This function iterates over the `self.modules` dictionary and prints each module name preceded by a hyphen.
+
+        Parameters:
+            None
+
+        Returns:
+            None
+        """
         print("Active Modules:")
-        for name in self.active_modules:
+        for name in self.modules:
             print(f"- {name}")
 
+    def select_module(self):
+        """
+        Display a list of available modules and their corresponding indices.
+
+        This function prints a list of available modules along with their indices.
+        The modules are displayed in the format "{index}: {module_name}.".
+
+        Parameters:
+            self (object): The instance of the class.
+
+        Returns:
+            None
+        """
+        print("Available Modules:")
+        for i, available_module in enumerate(self.modules.keys(), start=1):
+            print(f"{i}: {available_module}.")
+
     def cli(self):
+        """
+        A CLI function that displays options to the user, takes user input,
+        and performs the corresponding action based on the input.
+        """
         options = {
             "1": ("Add a Module Config", self.add_module_config),
-            "2": ("Install Module", self.install_module),
-            "3": ("Activate Module", self.activate_module),
-            "4": ("Remove Module", self.remove_module),
-            "5": ("Select config", self.get_active_modules),
-            "6": ("List Modules", self.list_modules),
-            "7": ("Exit", exit)
+            "2": ("Install Module", self.install_module_cli),
+            "3": ("Select Module", self.get_module),
+            "4": ("List Modules", self.list_modules),
+            "5": ("Remove Module", self.remove_module),
+            "6": ("Exit", exit),
         }
 
         while True:
@@ -141,35 +343,40 @@ class ModuleManager:
                 print(f"{key}. {description}")
 
             choice = input("Enter your choice: ")
-            for key, (_, action) in options.items():
-                if choice == "1":
-                    action()
-                elif choice == "2":
-                    module_name = input("Enter module_name: ")
-                    if module_name not in self.module_configs:
-                        options["1"][1]()
-                        module_name = self.module_configs[module_name]
-                    module_config = self.module_configs[module_name]
-                    action()
-                elif choice == "3":
-                    module_name = input("Enter module_name: ")
-                    module_config = self.module_configs[module_name] or options["1"][1]()
-                    action(module_config)
-                elif choice == "4":
-                    module_name = input("Enter module_name: ")
-                    action(module_name)
-                elif choice == "5":
-                    print(list(action().keys(), "\n"))
-                elif choice == "6":
-                    action(list(action().keys(), "\n"))
-                elif choice == "7":
-                    exit()
-                if choice == key:
-                    break
+            action = options.get(choice, (None, None))[1]
+            if action:
+                action()
             else:
                 print("Invalid choice. Please try again.")
-        
-                
+
+    def install_module_cli(self):
+        """
+        Installs a module based on user input.
+
+        This function prompts the user to enter the name of a module. It then checks if the module name is present in the `module_configs` dictionary. If the module name is not found, it adds a new config for the module using the `add_module_config` method. If the module name is found, it creates a `ModuleConfig` object using the module name and the corresponding config from `module_configs`. Finally, it calls the `install_module` method with the `module_config` object to install the module.
+
+        Parameters:
+            None
+
+        Returns:
+            None
+        """
+        module_name = input("Enter module name: ")
+        if module_name not in self.module_configs:
+            print(f"Module '{module_name}' not found in configs. Adding new config.")
+            self.add_module_config()
+        else:
+            module_config = ModuleConfig(**self.module_configs[module_name])
+            self.install_module(module_config)
+
+
 if __name__ == "__main__":
-    manager = ModuleManager()
+    module_config = ModuleConfig(
+        module_name=os.getenv("MODULE_NAME"),
+        module_path=os.getenv("MODULE_PATH"),
+        module_endpoint=os.getenv("MODULE_ENDPOINT"),
+        module_url=os.getenv("MODULE_URL"),
+    )
+    module = BaseModule(module_config)
+    manager = ModuleManager(module)
     manager.cli()

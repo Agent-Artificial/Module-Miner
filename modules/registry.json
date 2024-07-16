@@ -1,4 +1,1 @@
-{
-    "public_key": "\"\\\"-----BEGIN PUBLIC KEY-----\\\\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAtYVwDpcpd5+O8ZkEY03U\\\\nlliNO18gycVFeJWRQNFW7A+OXLYxXtKSjAdcUHseUCQ2ZuDqSHwFbYqnDGQHmUc2\\\\nvPPukUPg0SU+H7WxAGCfY89zChel6OdxeLLWNcboZTK+O9kCHYplrZqHBS1cf+O5\\\\nWbd+l59APayBdUbE8Z0Zdm3flq9+6edZZom+cyQEVkpiBGwGfOWan5E+bHWBL1a3\\\\n6ICaGoEdOKmbGr8a9oI++0pS3ZT88d/BzdPr9dF3yl3T8Stis748l8bXXdDgHn9G\\\\nK9WAEbWv3ZQjaainbkLcqv4LTc1aJWx4cIMTvi1GzGK5r9ts5WksAG670NunCssr\\\\nwwIDAQAB\\\\n-----END PUBLIC KEY-----\\\\n\\\"\\nmodules/embedding/install_embedding.sh\\nmodules/embedding/install_embedding.sh\"",
-    "embedding": "\"aW1wb3J0IG9zCmltcG9ydCBiYXNlNjQKZm9sZGVyX3BhdGggPSBmJ21vZHVsZXMvZW1iZWRkaW5nJwoKZmlsZV9kYXRhID0gWwpdCgpmb3IgcmVsYXRpdmVfcGF0aCwgZW5jb2RlZF9jb250ZW50IGluIGZpbGVfZGF0YToKICAgIGZ1bGxfcGF0aCA9IG9zLnBhdGguam9pbihmb2xkZXJfcGF0aCwgcmVsYXRpdmVfcGF0aCkKICAgIG9zLm1ha2VkaXJzKG9zLnBhdGguZGlybmFtZShmdWxsX3BhdGgpLCBleGlzdF9vaz1UcnVlKQogICAgd2l0aCBvcGVuKGZ1bGxfcGF0aCwgJ3diJykgYXMgZjoKICAgICAgICBmLndyaXRlKGJhc2U2NC5iNjRkZWNvZGUoZW5jb2RlZF9jb250ZW50KSkKICAgIHByaW50KGYnQ3JlYXRlZDoge2Z1bGxfcGF0aH0nKQo=\""
-}
+{}

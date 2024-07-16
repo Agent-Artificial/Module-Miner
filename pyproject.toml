@@ -1,0 +1,20 @@
+[tool.poetry]
+name = "module-miner"
+version = "0.1.0"
+description = "Modular Miner for the Eden network"
+authors = ["Richard <bakobiibizo@gmail.com>"]
+license = "MIT"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.10"
+fastapi = "^0.111.1"
+uvicorn = "^0.30.1"
+loguru = "^0.7.2"
+requests = "^2.32.3"
+python-dotenv = "^1.0.1"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

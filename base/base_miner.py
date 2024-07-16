@@ -1,17 +1,23 @@
 import json
 import subprocess
+import uvicorn
 from pathlib import Path
-from loguru import logger
 from abc import ABC, abstractmethod
-from typing import Dict, Optional, Any, List
+from typing import Dict, Optional, Any, List, Union
 from pydantic import BaseModel
-from fastapi import  APIRouter
-from communex.client import CommuneClient
-from communex._common import get_node_url
-from communex.compat.key import Keypair
-from base.base_module import ModuleConfig
+from fastapi import APIRouter, FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from base.base_module import BaseModule
 
-comx = CommuneClient(get_node_url())
+app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 class MinerRequest(BaseModel):
@@ -29,25 +35,45 @@ class MinerConfig(BaseModel):
     funding_key: Optional[str] = None
     funding_modifier: Optional[float] = None
     module_name: Optional[str] = None
-        
+
 
 class BaseMiner(ABC):
-    module_config: Optional[ModuleConfig] = None
-    module_configs: Optional[List[MinerConfig]] = []
-    miner_key_dict: Optional[Dict[str, Any]] = {}
-    key_name: Optional[str] = None
+    miner_config: Optional[Union[MinerConfig, Dict[str, Any]]] = {}
+    miner_configs: Optional[Dict[str, Union[MinerConfig, Dict[str, Any]]]] = {}
     miners: Optional[Dict[str, Any]] = {}
     router: Optional[APIRouter] = None
-    
-    def __init__(self, module_config: ModuleConfig, miner_config: MinerConfig):
-        self.module_config = module_config
+    module: Optional[BaseModule] = None
+
+    def __init__(self, miner_config: MinerConfig, module: BaseModule):
+        """
+        Initializes a new instance of the BaseMiner class.
+
+        Args:
+            miner_config (MinerConfig): The configuration for the miner.
+            module (BaseModule): The module to be used by the miner.
+
+        Returns:
+            None
+        """
         self.miner_config = miner_config
-        self.module_configs = self._load_configs("modules/module_configs.json")
         self.miner_configs = self._load_configs("modules/miner_configs.json")
-        self.miners = self._load_miner_keys()
         self.router = APIRouter()
+        self.module = module
 
     def _load_configs(self, file_path: str) -> List[Dict[str, Any]]:
+        """
+        Load configurations from a JSON file.
+
+        Args:
+            file_path (str): The path to the JSON file containing the configurations.
+
+        Returns:
+            List[Dict[str, Any]]: A list of dictionaries representing the configurations.
+                If the file does not exist, an empty list is returned.
+
+        Raises:
+            None
+        """
         path = Path(file_path)
         if path.exists():
             return json.loads(path.read_text(encoding="utf-8"))
@@ -55,44 +81,67 @@ class BaseMiner(ABC):
         path.write_text(json.dumps(configs, indent=4), encoding="utf-8")
         return configs
 
-    def _load_miner_keys(self) -> Dict[str, Any]:
-        key_path = Path("data/instance_data/miner_keys.json")
-        if key_path.exists():
-            return json.loads(key_path.read_text(encoding="utf-8"))
-        
-        self.miner_key_dict = {
-            config["miner_name"]: json.loads(Path(config["miner_keypath"]).read_text(encoding="utf-8"))
-            for config in self.miner_configs
-            if Path(config["miner_keypath"]).exists()
-        }
-        
-        key_path.write_text(json.dumps(self.miner_key_dict, indent=4), encoding="utf-8")
-        return self.miner_key_dict
+    def add_route(self, module: BaseModule, app: FastAPI):
+        """
+        Adds a route to the FastAPI app for the specified module.
+        The route handles GET requests to '/modules/{request.module_name}/process'
+        and processes the request by instantiating the module with the provided configuration
+        and calling its 'process' method.
 
-    def add_route(self, module_name: str):
-        @self.router.post(f"/modules/{module_name}/process")
-        def process_request(request: MinerRequest):
-            return self.process(request)
-        app.include_router(self.router)
+        Parameters:
+        - module: BaseModule - The module to be used for processing the request.
+        - app: FastAPI - The FastAPI application to add the route to.
 
-    @staticmethod
-    def run_server(host_address: str, port: int):
-        import uvicorn
-        uvicorn.run(app, host=host_address, port=port)
+        Returns:
+        - None
+        """
+        router = APIRouter()
+        request_module = module
 
-    def add_miner_key(self, key_name: str, miner_keypath: Path = Path("data/instance_data/miner_keys.json"), miner_config: Optional[MinerConfig] = None):
-        if miner_config:
-            self.miner_key_dict[key_name] = miner_config.model_dump()
-        else:
-            config = self._prompt_miner_config()
-            self.miner_key_dict[key_name] = config.model_dump()
-        
-        self._save_miner_keys(miner_keypath)
+        @router.get("/modules/{request.module_name}/process")
+        async def process_request(request: MinerRequest):
+            """
+            Process a request for a specific module.
+
+            This function is a route handler for GET requests to '/modules/{request.module_name}/process'.
+            It receives a `MinerRequest` object as a parameter, which contains information about the module to be processed.
+            The function creates a `module_config` dictionary with the necessary information from the request.
+            It then uses the `request_module` function to instantiate a module with the provided configuration.
+            Finally, it calls the `process` method of the module with the request as an argument and returns the result.
+
+            Parameters:
+            - request (MinerRequest): The request object containing information about the module to be processed.
+
+            Returns:
+            - The result of calling the `process` method of the module with the request as an argument.
+            """
+            module_config = {
+                "module_name": request.module_name,
+                "module_path": request.module_path,
+                "module_endpoint": request.module_endpoint,
+                "module_url": request.module_url,
+            }
+            module = request_module(**module_config)
+            return await module.process(request)
+
+        app.include_router(router)
 
     def _prompt_miner_config(self) -> MinerConfig:
+        """
+        Prompts the user to enter miner configuration details and returns a MinerConfig object.
+
+        Parameters:
+        - None
+
+        Returns:
+        - MinerConfig: An object containing the miner configuration details entered by the user.
+        """
         return MinerConfig(
             miner_name=input("Enter miner_name: "),
-            miner_keypath=input("Enter miner_keypath [ex. $HOME/.commune/key/my_miner.json]: ") or None,
+            miner_keypath=input(
+                "Enter miner_keypath [ex. $HOME/.commune/key/my_miner.json]: "
+            )
+            or None,
             miner_host=input("Enter miner_host [default 0.0.0.0]: ") or "0.0.0.0",
             external_address=input("Enter external_address: ") or None,
             miner_port=int(input("Enter miner_port [default 5757]: ") or 5757),
@@ -102,36 +151,68 @@ class BaseMiner(ABC):
             funding_modifier=float(input("Enter modifier [default 15COM]: ") or 15),
         )
 
-    def remove_miner_key(self, key_name: str, miner_keypath: Path):
-        self.miner_key_dict.pop(key_name, None)
-        self._save_miner_keys(miner_keypath)
+    def serve_miner(
+        self,
+        miner_config: MinerConfig,
+        reload: Optional[bool] = True,
+        register: bool = False,
+    ):
+        """
+        Serves the miner with the specified miner configuration.
 
-    def update_miner_key(self, key_name: str, miner_config: MinerConfig, miner_keypath: Path):
-        self.miner_key_dict[key_name] = miner_config.model_dump()
-        self._save_miner_keys(miner_keypath)
+        Parameters:
+        - self: The BaseMiner object.
+        - miner_config: MinerConfig - The configuration for the miner.
+        - reload: Optional[bool] - Whether to reload the miner. Defaults to True.
+        - register: bool - Whether to register the miner or not.
 
-    def _save_miner_keys(self, miner_keypath: Path):
-        miner_keypath.write_text(json.dumps(self.miner_key_dict, indent=4), encoding="utf-8")
-
-    def get_keypair(self, key_name: str) -> Keypair:
-        key_folder_path = Path(self.module_config.key_folder_path)
-        json_data = json.loads((key_folder_path / f"{key_name}.json").read_text(encoding='utf-8'))["data"]
-        key_data = json.loads(json_data)
-        return Keypair(key_data["private_key"], key_data["public_key"], key_data["ss58_address"])
-
-    def register_miner(self, miner_config: MinerConfig):
-        command = f"bash modules/setup_miners.sh {miner_config.miner_name} {miner_config.miner_keypath} {miner_config.external_address} {miner_config.miner_port} {miner_config.stake} {miner_config.netuid} {miner_config.funding_key} {miner_config.funding_modifier}"
-        result = subprocess.run(command, shell=True, check=True, capture_output=True, text=True)
-        logger.info(result.stdout)
-        logger.info(result.stderr)
-        
-    def serve_miner(self, miner_config: MinerConfig, register: bool = False):
-        self.add_route(miner_config.module_name)
+        Returns:
+        - None
+        """
         if register:
             self.register_miner(miner_config)
-            logger.info(f"Registered {miner_config.miner_name} at {miner_config.external_address}:{miner_config.miner_port}")
-        self.run_server(miner_config.miner_host, miner_config.miner_port)
+        uvicorn.run(
+            "base.api:app",
+            host=miner_config.miner_host,
+            port=miner_config.miner_port,
+            reload=reload,
+        )
+
+    def register_miner(self, miner_config: MinerConfig):
+        """
+        Registers a new miner using the provided miner configuration.
+
+        Parameters:
+        - self: The BaseMiner object.
+        - miner_config: MinerConfig - The configuration for the miner.
+
+        Returns:
+        - None
+        """
+        command = [
+            "bash",
+            "chains/commune/register_miner.sh",
+            "register",
+            f"{miner_config.miner_name}",
+            f"{miner_config.miner_keypath}",
+            f"{miner_config.miner_host}",
+            f"{miner_config.port}",
+            f"{miner_config.netuid}",
+            f"{miner_config.stake}",
+            f"{miner_config.funding_key}",
+            f"{miner_config.modifier}",
+        ]
+        subprocess.run(command, check=True)
 
     @abstractmethod
     def process(self, miner_request: MinerRequest) -> Any:
-        """Process a request made to the module."""
+        """
+        Process the given `MinerRequest` using the `module` and return the result.
+
+        Args:
+            miner_request (MinerRequest): The request to be processed.
+
+        Returns:
+            Any: The result of the processing.
+        """
+        self.module.process(miner_request)

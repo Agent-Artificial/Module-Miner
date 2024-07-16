@@ -1,0 +1,15 @@
+python
+fastapi
+uvicorn
+loguru
+requests
+python-dotenv
+substrate-interface
+cryptography
+eth-hash
+eth-account
+menmonic
+solders
+bitcoinlib
+scalecodec
+pytest
