@@ -303,6 +303,7 @@ class ModuleManager:
         Returns:
             None
         """
+        Print("")
         print("Active Modules:")
         for name in self.modules:
             print(f"- {name}")
@@ -357,7 +358,7 @@ class ModuleManager:
             else:
                 print("Invalid choice. Please try again.")
 
-    def install_module_cli(self):
+    def install_module_cli(self, module_config: ModuleConfig):
         """
         Installs a module based on user input.
 

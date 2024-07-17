@@ -78,3 +78,4 @@ miner = TranslationMiner(module_config=module_settings, miner_config=miner_setti
 
 miner.add_route(module_settings.module_name)
 
+
