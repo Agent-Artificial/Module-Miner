@@ -1,10 +1,12 @@
 import uvicorn
-from bittensor import ALL_COMMANDS as cli_structure
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import HTMLResponse
 from markdown2 import markdown2
+
+from bittensor import ALL_COMMANDS as cli_structure
+from bittensor.axon import FastAPIThreadedServer, AxonMiddleware
 
 
 app = FastAPI()
