@@ -55,6 +55,8 @@ def create_endpoint(path, command_info):
 
 
 def create_command_endpoint(path, command_name, command_class):
+    command_name = command_name.replace("_", "-")
+    command_class = command_class
     @app.get(path)
     async def command_endpoint():
         function_info = None

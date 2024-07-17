@@ -7,7 +7,7 @@ from bittensor.axon import axon
 from bittensor.metagraph import metagraph
 from bittensor.dendrite import dendrite
 from bittensor.synapse import Synapse
-from chains.tao.key_manager import TaoKeyManager
+from chains.tao.utils.key_manager import TaoKeyManager
 
 
 tao = TaoKeyManager()
