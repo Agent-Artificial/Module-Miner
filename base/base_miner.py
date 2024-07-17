@@ -81,7 +81,7 @@ class BaseMiner(ABC):
         path.write_text(json.dumps(configs, indent=4), encoding="utf-8")
         return configs
 
-    def add_route(self, module: BaseModule, app: FastAPI):
+    def add_route(self, module: BaseModule):
         """
         Adds a route to the FastAPI app for the specified module.
         The route handles GET requests to '/modules/{request.module_name}/process'
@@ -172,7 +172,7 @@ class BaseMiner(ABC):
         if register:
             self.register_miner(miner_config)
         uvicorn.run(
-            "base.api:app",
+            "api:app",
             host=miner_config.miner_host,
             port=miner_config.miner_port,
             reload=reload,

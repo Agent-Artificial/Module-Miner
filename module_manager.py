@@ -26,7 +26,7 @@ miner_config = MinerConfig(
 
 
 class ModuleManager:
-    def __init__(self, module: BaseModule):
+    def __init__(self, module: BaseModule, module_config: ModuleConfig):
         """
         Initializes the ModuleManager with the given module.
 
@@ -36,6 +36,7 @@ class ModuleManager:
         Returns:
             None
         """
+        self.module_config = module_config
         self.module = module
         self.modules: Dict[str, Any] = {}
         self.active_modules: Dict[str, Any] = {}
@@ -124,7 +125,7 @@ class ModuleManager:
             module_endpoint=module_endpoint
             or os.getenv("MODULE_ENDPOINT")
             or f"/modules/{input_name}",
-            module_url=module_url or os.getenv("MODULE_URL") or "http://localhost:4267",
+            module_url=module_url or os.getenv("MODULE_URL") or "https://module-registrar.ngro.app",
         )
         self.module_configs[module_config.module_name] = module_config.model_dump()
         self.save_configs()
@@ -322,6 +323,12 @@ class ModuleManager:
         print("Available Modules:")
         for i, available_module in enumerate(self.modules.keys(), start=1):
             print(f"{i}: {available_module}.")
+    
+    def serve_module(self):
+        module_config = self.module_config
+        module = import_module(f"modules.{module_config.module_name}.{module_config.module_name}_module")
+        miner = module.TranslationMiner(miner_config=module.miner_settings, module_config=module.module_settings)
+        miner.serve_miner(miner_config, reload=True, register=False)
 
     def cli(self):
         """
@@ -334,7 +341,8 @@ class ModuleManager:
             "3": ("Select Module", self.get_module),
             "4": ("List Modules", self.list_modules),
             "5": ("Remove Module", self.remove_module),
-            "6": ("Exit", exit),
+            "6": ("Serve Module", self.serve_module),
+            "7": ("Exit", exit),
         }
 
         while True:
@@ -378,5 +386,5 @@ if __name__ == "__main__":
         module_url=os.getenv("MODULE_URL"),
     )
     module = BaseModule(module_config)
-    manager = ModuleManager(module)
+    manager = ModuleManager(module, module_config)
     manager.cli()
