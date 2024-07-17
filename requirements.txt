@@ -13,3 +13,4 @@ solders
 bitcoinlib
 scalecodec
 pytest
+git+https://github.com/opentensor/bittensor-subnet-template
