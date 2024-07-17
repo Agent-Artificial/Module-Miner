@@ -325,8 +325,7 @@ class ModuleManager:
         for i, available_module in enumerate(self.modules.keys(), start=1):
             print(f"{i}: {available_module}.")
     
-    def serve_module(self):
-        module_config = self.module_config
+    def serve_module(self, module_config):
         module = import_module(f"modules.{module_config.module_name}.{module_config.module_name}_module")
         miner = module.TranslationMiner(miner_config=module.miner_settings, module_config=module.module_settings)
         miner.serve_miner(miner_config, reload=True, register=False)
@@ -354,7 +353,7 @@ class ModuleManager:
             choice = input("Enter your choice: ")
             action = options.get(choice, (None, None))[1]
             if action:
-                action()
+                action(self.module_config)
             else:
                 print("Invalid choice. Please try again.")
 
