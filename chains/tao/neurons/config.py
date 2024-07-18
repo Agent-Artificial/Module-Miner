@@ -1,4 +1,6 @@
+import os
 from bittensor.config import config
+from dotenv import load_dotenv
 
 
 def get_config():
@@ -23,8 +25,8 @@ def get_config():
         "priority": {"max_workers": 5, "maxsize": 10},
         "prometheus": {"port": 7091, "level": "INFO"},
         "wallet": {
-            "name": "test_cold_miner",
-            "hotkey": "test_miner_hot",
+            "name": os.getenv("MINER_COLD_KEY"),
+            "hotkey": os.getenv("MINER_HOT_KEY"),
             "path": "~/.bittensor/wallets/",
         },
         "dataset": {
