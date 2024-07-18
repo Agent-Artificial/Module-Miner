@@ -28,12 +28,6 @@ class TAOMiner(BaseMinerNeuron):
     def serve_module(self, app: FastAPI):
         self.axon.serve_modules(app)
     
-    def cli_command(self, **kwargs):
-        commands = {
-            "wallet":["btcli", "wallet", f"{kwargs['command']}", "--wallet.name", f"{kwargs['wallet_name']}", "--subtensor.chain_endpoint", "ws://127.0.0.1:9946"],
-            "subnet": ["btcli", "subnet", f"{kwargs['command']}", "--wallet.name", f"{kwargs['wallet_name']}", "--wallet.hotkey", f"{kwargs['hotkey']}", "--subtensor.chain_endpoint", "ws://127.0.0.1:9946"]
-            }
-    
-    def get_cli_commands(self):
-        return ["wallet", "subnet"]
+
+                
         

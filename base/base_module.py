@@ -122,7 +122,7 @@ class BaseModule(BaseModel):
         if existing_module is None:
             os.makedirs(self.module_config.module_path, exist_ok=True)
             module_setup_path.write_text(
-                base64.b64decode(module).decode("utf-8"), encoding="utf-8"
+                module, encoding="utf-8"
             )
         return existing_module or module
 

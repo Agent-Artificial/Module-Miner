@@ -10,7 +10,7 @@ def get_config():
             "update_interval": 50000,
             "output_in_place": True,
             "verbose": False,
-            "cuda": {"dev_id": [0], "use_cuda": False, "tpb": 256},
+            "cuda": {"dev_id": [0], "use_cuda": True, "tpb": 256},
         },
         "axon": {
             "port": 4267,
@@ -23,8 +23,8 @@ def get_config():
         "priority": {"max_workers": 5, "maxsize": 10},
         "prometheus": {"port": 7091, "level": "INFO"},
         "wallet": {
-            "name": "default",
-            "hotkey": "default",
+            "name": "test_cold_miner",
+            "hotkey": "test_miner_hot",
             "path": "~/.bittensor/wallets/",
         },
         "dataset": {
