@@ -1,16 +1,17 @@
 import uvicorn
 from fastapi import FastAPI
+
 from subnet_template.neurons.miner import BaseMinerNeuron
 
-from chains.tao.neurons.config import get_config, Config
+from chains.tao.neurons.config import get_config
 from chains.tao.axons.axon import ModuleAxon, Process, ModuleRequest
 from base.base_module import BaseModule
 
-default_config = get_config(is_miner=True, use_cli=False)
+default_config = get_config()
 
 
 class TAOMiner(BaseMinerNeuron):
-    def __init__(self, config: Config):
+    def __init__(self, config: default_config = default_config):
         super().__init__(config)
         self.config = config
         self.axon = ModuleAxon(config.wallet)
@@ -26,5 +27,10 @@ class TAOMiner(BaseMinerNeuron):
         
     def serve_module(self, app: FastAPI):
         self.axon.serve_modules(app)
-        
+    
+    def cli_command(self, **kwargs):
+        commands = {
+            "wallet":["btcli", "wallet", f"{kwargs['command']}", "--wallet.name", f"{kwargs['wallet_name']}", "--subtensor.chain_endpoint", "ws://127.0.0.1:9946"],
+            "subnet": ["btcli", "subnet", f"{kwargs['command']}", "--wallet.name", f"{kwargs['wallet_name']}", "--wallet.hotkey", f"{kwargs['hotkey']}", "--subtensor.chain_endpoint", "ws://127.0.0.1:9946"]
+            }
         

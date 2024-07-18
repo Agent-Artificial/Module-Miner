@@ -3,9 +3,12 @@ import ast
 import os
 from pathlib import Path
 from dotenv import load_dotenv
-from mining_ops.data_parsing.data_models import CODE_PATH, FUNCTION_PATH
+
 
 load_dotenv()
+
+CODE_PATH = os.getenv("CODE_PATH")
+FUNCTION_PATH = os.getenv("FUNCTION_PATH")
 
 
 def extract_function_calls(code):

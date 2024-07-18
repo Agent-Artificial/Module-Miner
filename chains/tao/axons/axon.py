@@ -5,12 +5,13 @@ from pydantic import BaseModel
 from typing import List, Union, Any, Callable
 from chains.tao.axons.protocol import ModuleRequest
 from bittensor.subnets import SubnetsAPI
-from chains.tao.utils.btcli_functions import app, create_command_endpoint, create_endpoint
+from chains.tao.axons.btcli_functions import app, create_command_endpoint, create_endpoint
 from data_models import MinerRequest, BaseModule
 
 
-class Process(BaseModel):
-    process: Callable[..., Any]
+class Process:
+    def __init__(self, process: Callable[..., Any]):
+        self.process = process
 
 
 class ModuleAxon(SubnetsAPI):
