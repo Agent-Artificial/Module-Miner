@@ -1,4 +1,6 @@
 import bittensor
+import uvicorn
+from fastapi import FastAPI
 from pydantic import BaseModel
 from typing import List, Union, Any, Callable
 from chains.tao.axons.protocol import ModuleRequest
@@ -41,3 +43,6 @@ class ModuleAxon(SubnetsAPI):
         
     def set_process(self, module: BaseModule):
         self.process = Process(process=module.process)
+        
+    def serve_modules(self, app: FastAPI):
+        uvicorn.run(app, host="0.0.0.0", port=8000)

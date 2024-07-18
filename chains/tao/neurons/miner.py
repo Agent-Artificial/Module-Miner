@@ -1,3 +1,5 @@
+import uvicorn
+from fastapi import FastAPI
 from subnet_template.neurons.miner import BaseMinerNeuron
 
 from chains.tao.neurons.config import get_config, Config
@@ -22,5 +24,7 @@ class TAOMiner(BaseMinerNeuron):
     def set_process(self, module: BaseModule):
         self.axon.set_process(module)
         
+    def serve_module(self, app: FastAPI):
+        self.axon.serve_modules(app)
         
         
