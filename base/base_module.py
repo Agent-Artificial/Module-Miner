@@ -1,4 +1,5 @@
 import os
+import json
 import base64
 import requests
 import subprocess
@@ -108,23 +109,21 @@ class BaseModule(BaseModel):
         """
         A description of the entire function, its parameters, and its return types.
         """
-        module = requests.get(
-            f"{self.module_config.module_url}{self.module_config.module_endpoint}",
-            timeout=30,
-        ).text
-        os.makedirs("modules", exist_ok=True)
-
-        module_setup_path = Path(
-            f"{self.module_config.module_path}/setup_{self.module_config.module_name}.py"
-        )
-        existing_module = self.check_for_existing_module()
-
-        if existing_module is None:
-            os.makedirs(self.module_config.module_path, exist_ok=True)
-            module_setup_path.write_text(
-                module, encoding="utf-8"
-            )
-        return existing_module or module
+        name = os.getenv("MODULE_NAME")
+        endpoint = os.getenv("MODULE_ENDPOINT")
+        url = os.getenv("MODULE_URL")
+        filepath = f"{os.getenv('MODULE_PATH')}/setup_{name}.py"
+        
+        module = json.loads(requests.get(f"{url}{endpoint}").json())
+        
+        filepath = Path(filepath)
+        
+        if not filepath.exists():
+            filepath.parent.mkdir(parents=True)
+        
+        filepath.write_text(json.loads(module))
+        
+        return module
 
     def remove_module(self):
         """
