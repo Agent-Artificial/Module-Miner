@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+  module-miner:
+    build: .
+    environment:
+      - MINER_COLD_KEY=${MINER_COLD_KEY}
+      - MINER_HOT_KEY=${MINER_HOT_KEY}
+      - MINER_PASSWORD=${MINER_PASSWORD}
+      - VALIDATOR_COLD_KEY=${VALIDATOR_COLD_KEY}
+      - VALIDATOR_HOT_KEY=${VALIDATOR_HOT_KEY}
+      - VALIDATOR_PASSWORD=${VALIDATOR_PASSWORD}
+      - MINER_PORT=${MINER_PORT}
+      - STAKE=${STAKE}
+      - NETUID=${NETUID}
+      - EXTERNAL_ADDRESS=${EXTERNAL_ADDRESS}
+      - MODULE_NAME=${MODULE_NAME}
+      - MODULE_PATH=${MODULE_PATH}
+      - MODULE_ENDPOINT=${MODULE_ENDPOINT}
+      - MODULE_URL=${MODULE_URL}
+      - CODE_PATH=${CODE_PATH}
+      - FUNCTION_PATH=${FUNCTION_PATH}
+      - PRIVATE_KEY_PASSWORD=${PRIVATE_KEY_PASSWORD}
+    ports:
+      - "${MINER_PORT}:${MINER_PORT}"
+    volumes:
+      - miner-data:/miner
+
+volumes:
+  miner-data:
