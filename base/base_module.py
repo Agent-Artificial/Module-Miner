@@ -17,6 +17,7 @@ class ModuleConfig(BaseModel):
 
 class BaseModule(BaseModel):
     module_config: Optional[ModuleConfig] = None
+    interaction: bool = True
 
     def __init__(self, module_config: ModuleConfig):
         """
@@ -33,6 +34,9 @@ class BaseModule(BaseModel):
         super().__init__(module_config=module_config)
         self.module_config = module_config
         self.init_module()
+
+    def set_interaction(self, interaction_level: bool):
+        self.interaction = interaction_level
 
     def init_module(self):
         """
@@ -58,8 +62,11 @@ class BaseModule(BaseModel):
         if path.exists():
             content = path.read_text(encoding="utf-8")
             print(content)
-            user_input = input(f"{message} Do you want to overwrite it? (y/n) ").lower()
-            return None if user_input in ["y", "yes"] else content
+            if self.interaction:
+                user_input = input(f"{message} Do you want to overwrite it? (y/n) ").lower()
+                return None if user_input in ["y", "yes"] else content
+            else:
+                return True
         return None
 
     def check_public_key(self) -> Optional[str]:
@@ -119,9 +126,9 @@ class BaseModule(BaseModel):
         filepath = Path(filepath)
         
         if not filepath.exists():
-            filepath.parent.mkdir(parents=True)
+            filepath.parent.mkdir(parents=True, exist_ok=True)
         
-        filepath.write_text(json.loads(module))
+        filepath.write_text(module)
         
         return module
 

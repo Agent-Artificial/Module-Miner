@@ -1,8 +1,10 @@
 import os
+import sys
 import json
 import base64
 import requests
 import subprocess
+import argparse
 from importlib import import_module
 from typing import Dict, Any, Optional
 from pydantic import BaseModel
@@ -41,6 +43,10 @@ class ModuleManager:
         self.modules: Dict[str, Any] = {}
         self.active_modules: Dict[str, Any] = {}
         self.module_configs: Dict[str, Any] = self.get_configs()
+        self.interaction = True
+        
+    def set_interaction(self, interaction_level: bool):
+        self.interaction = interaction_level
 
     def get_configs(self) -> Dict[str, Any]:
         """
@@ -112,9 +118,14 @@ class ModuleManager:
             - It saves the module in the module registry.
             - It sets up the module.
         """
-        input_name = (
-            module_name or os.getenv("MODULE_NAME") or input("Add module name: ")
-        )
+        if self.interaction:
+            input_name = (
+                module_name or os.getenv("MODULE_NAME") or input("Add module name: ")
+            )
+        else:
+            input_name = (
+                module_name or os.getenv("MODULE_NAME")
+            )
 
         module_name = input_name
         module_config = ModuleConfig(
@@ -156,7 +167,6 @@ class ModuleManager:
             - It sets up the module.
 
         """
-        self.module.check_for_existing_module()
         self.module.install_module(module_config)
         self.module_configs[module_config.module_name] = module_config.model_dump()
         self.save_configs()
@@ -177,10 +187,13 @@ class ModuleManager:
         Returns:
             bool: True if the user wants to overwrite the module, False otherwise.
         """
-        return input("Module already exists. Overwrite? [y/N]: ").lower() in [
-            "y",
-            "yes",
-        ]
+        if self.interaction:
+            return input("Module already exists. Overwrite? [y/N]: ").lower() in [
+                "y",
+                "yes",
+            ]
+        else:
+            return True
 
     def request_module(self, module_config: ModuleConfig):
         """
@@ -335,6 +348,10 @@ class ModuleManager:
         A CLI function that displays options to the user, takes user input,
         and performs the corresponding action based on the input.
         """
+        if self.interaction == False:
+            print("This function should not be called when the --no-interaction flag is set.")
+            sys.exit(1)
+        
         options = {
             "1": ("Add a Module Config", self.add_module_config),
             "2": ("Install Module", self.install_module_cli),
@@ -387,4 +404,28 @@ if __name__ == "__main__":
     )
     module = BaseModule(module_config)
     manager = ModuleManager(module, module_config)
-    manager.cli()
+
+    parser = argparse.ArgumentParser(description="Module Manager CLI")
+    parser.add_argument("--no-interaction", action="store_true", help="Run the module manager without user interaction")
+    parser.add_argument("--install", action="store_true", help="Automatically install module on start. --no-interaction is required for this to work")
+    args = parser.parse_args()
+
+    if args.no_interaction:
+        module.set_interaction(False)
+        manager.set_interaction(False)
+        if args.install:
+            module_name = os.getenv("MODULE_NAME")
+            if module_name == module_config.module_name:
+                manager.add_module_config(
+                    module_name=module_config.module_name,
+                    module_path=module_config.module_path,
+                    module_endpoint=module_config.module_endpoint,
+                    module_url=module_config.module_url,
+                )
+                manager.install_module(module_config)
+            else:
+                print("Module name not found in environment or configs.")
+        else:
+            print("Nothing happened. Did you forget to pass --install?")
+    else:
+        manager.cli()
