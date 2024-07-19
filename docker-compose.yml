@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   module-miner:
     build: .
@@ -20,7 +18,7 @@ services:
       - MODULE_URL=${MODULE_URL}
       - CODE_PATH=${CODE_PATH}
       - FUNCTION_PATH=${FUNCTION_PATH}
-      - PRIVATE_KEY_PASSWORD=${PRIVATE_KEY_PASSWORD}
+      - PRIVATE_KEY_PASSWORD="${PRIVATE_KEY_PASSWORD}"
     ports:
       - "${MINER_PORT}:${MINER_PORT}"
     volumes:

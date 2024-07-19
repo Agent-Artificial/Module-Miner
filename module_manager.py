@@ -167,6 +167,7 @@ class ModuleManager:
             - It sets up the module.
 
         """
+        self.module.check_for_existing_module()
         self.module.install_module(module_config)
         self.module_configs[module_config.module_name] = module_config.model_dump()
         self.save_configs()
@@ -422,7 +423,6 @@ if __name__ == "__main__":
                     module_endpoint=module_config.module_endpoint,
                     module_url=module_config.module_url,
                 )
-                manager.install_module(module_config)
             else:
                 print("Module name not found in environment or configs.")
         else:
