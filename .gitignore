@@ -10,3 +10,6 @@ __pycache__
 templates
 .vscode
 .pyest_cache
+modules/*
+!modules/
+!modules/__init__.py
